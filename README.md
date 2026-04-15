@@ -2,7 +2,7 @@
 
 
 ## Updates
-[20206/04/15] we released pre-trained checkpoints and processed fine-tuning datasets, which are now publicly available on Google Drive: [Google Drive](https://drive.google.com/drive/folders/1_IMfmpB34SM7nUSzzivd_7wAOnt2zwzE?usp=sharing).
+[2026/04/15] we released pre-trained checkpoints and processed fine-tuning datasets, which are now publicly available on Google Drive: [Google Drive](https://drive.google.com/drive/folders/1_IMfmpB34SM7nUSzzivd_7wAOnt2zwzE?usp=sharing).
 
 
 ## Envonriment Setup
