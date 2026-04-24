@@ -50,7 +50,7 @@ class NetTTT(nn.Module):
             self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
             self.decoder_pos_embed = nn.Parameter(torch.zeros(1, self.num_patches + self.num_cls_token, decoder_embed_dim))
             decoder_config = TTTConfig(num_hidden_layers = decoder_depth, hidden_size = decoder_embed_dim, intermediate_size = mlp_ratio * decoder_embed_dim)
-            self.decoder_blocks = nn.ModuleList([Block(decoder_config, layer_idx) for layer_idx in range(depth)])
+            self.decoder_blocks = nn.ModuleList([Block(decoder_config, layer_idx) for layer_idx in range(decoder_depth)])
             self.decoder_pred = nn.Linear(decoder_embed_dim, stride_size * in_chans, bias=True)  # decoder to stride
             # --------------------------------------------------------------------------
         else:

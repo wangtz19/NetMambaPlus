@@ -3,7 +3,7 @@ import subprocess
 import json
 
 BYTE_PACKET_NUM = 5
-SEQ_PACKET_NUM = 50
+SEQ_PACKET_NUM = 20
 STRIDE_LEN = 4
 HEADER_BYTE_NUM = 80
 PAYLOAD_BYTE_NUM = 240
@@ -20,15 +20,17 @@ def run(cuda_idx, dataset, model_name, ckpt_step=100000, epochs=120, strategy="n
 CUDA_VISIBLE_DEVICES={cuda_idx} python -u ../fine-tune.py \\
     --num_packet {BYTE_PACKET_NUM} \\
     --num_packet_byte {HEADER_BYTE_NUM + PAYLOAD_BYTE_NUM} \\
+    --seq_len {SEQ_PACKET_NUM} \\
     --stride_size {STRIDE_LEN} \\
     --batch_size 128 \\
     --epochs {epochs} \\
     --nb_classes {num_class} \\
+    --dataset_type byte_size_interval \\
     --finetune "{ckpt_path}" \\
     --data_path {data_dir} \\
     --output_dir "{output_dir}" \\
     --log_dir "{output_dir}" \\
-    --model net_{model_name}_classifier \\
+    --model fuse3_{model_name}_classifier \\
     --no_amp \\
     > "{output_dir}/finetune.txt" 2>&1 &
 """

@@ -20,7 +20,6 @@ class NetTransformer(nn.Module):
                  is_pretrain=False,
                  if_cls_token=True,
                  device=None, dtype=None,
-                 return_attn=False,
                  conf_learning=False,
                  num_embeddings=None,
                  seq_len=50,
@@ -33,7 +32,6 @@ class NetTransformer(nn.Module):
         self.num_classes = num_classes
         self.d_model = self.num_features = self.embed_dim = embed_dim  # num_features for consistency with other models
         self.is_pretrain = is_pretrain
-        self.return_attn = return_attn
         self.conf_learning = conf_learning
         self.stride_size = stride_size
         self.num_embeddings = num_embeddings
@@ -57,8 +55,8 @@ class NetTransformer(nn.Module):
         self.pos_drop = nn.Dropout(p=drop_rate)
         # Mamba blocks
         self.blocks = nn.ModuleList([
-            create_block(d_model=embed_dim, n_heads=n_heads, d_head=embed_dim // n_heads, dropout=0.1, 
-                         block_name=block_name, return_attn=return_attn)
+            create_block(d_model=embed_dim, n_heads=n_heads, d_head=embed_dim // n_heads, dropout=0.1,
+                         block_name=block_name)
             for _ in range(depth)])
         self.norm = nn.LayerNorm(embed_dim, eps=1e-6)
         # --------------------------------------------------------------------------
@@ -70,8 +68,8 @@ class NetTransformer(nn.Module):
             self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
             self.decoder_pos_embed = nn.Parameter(torch.zeros(1, self.num_patches + self.num_cls_token, decoder_embed_dim))
             self.decoder_blocks = nn.ModuleList([
-                create_block(d_model=decoder_embed_dim, n_heads=n_heads, d_head=decoder_embed_dim // n_heads, dropout=0.1, 
-                             block_name=block_name, return_attn=return_attn)
+                create_block(d_model=decoder_embed_dim, n_heads=n_heads, d_head=decoder_embed_dim // n_heads, dropout=0.1,
+                             block_name=block_name)
                 for _ in range(decoder_depth)])
             self.decoder_pred = nn.Linear(decoder_embed_dim, stride_size * in_chans, bias=True)  # decoder to stride
             # --------------------------------------------------------------------------
@@ -91,7 +89,8 @@ class NetTransformer(nn.Module):
         if not self.is_pretrain:
             self.head.apply(segm_init_weights)
         trunc_normal_(self.pos_embed, std=.02)
-        trunc_normal_(self.cls_token, std=.02)
+        if self.if_cls_token:
+            trunc_normal_(self.cls_token, std=.02)
         if self.is_pretrain:
             trunc_normal_(self.decoder_pos_embed, std=.02)
             trunc_normal_(self.mask_token, std=.02)
@@ -132,22 +131,13 @@ class NetTransformer(nn.Module):
         x = self.pos_drop(x)
 
         # apply Mamba blocks
-        attn_list = []
         for blk in self.blocks:
-            if self.return_attn:
-                x, attn = blk(x)
-                attn_list.append(attn)
-            else:
-                x = blk(x)[0]
+            x = blk(x)
         x = self.norm(x)
         if if_mask:
             return x, mask, ids_restore # type: ignore
         else:
-            # return x
-            if self.return_attn:
-                return x, attn_list
-            else:
-                return x
+            return x
 
     def forward_decoder(self, x: torch.Tensor, ids_restore: torch.Tensor):
         # embed tokens
@@ -171,7 +161,7 @@ class NetTransformer(nn.Module):
 
         # apply Mamba blocks
         for blk in self.decoder_blocks:
-            x = blk(x)[0]
+            x = blk(x)
 
         # predictor projection
         x = self.decoder_pred(x)
@@ -210,17 +200,12 @@ class NetTransformer(nn.Module):
             loss = self.forward_rec_loss(imgs, pred, mask)  # type: ignore
             return loss
         else:
-            if self.return_attn:
-                x, attn_list = self.forward_encoder(imgs, mask_ratio=mask_ratio, if_mask=False)  # type: ignore
-            else:
-                x = self.forward_encoder(imgs, mask_ratio=mask_ratio, if_mask=False)
-                attn_list = None
+            x = self.forward_encoder(imgs, mask_ratio=mask_ratio, if_mask=False)
             cls_token = x[:, -1, :] if self.if_cls_token else torch.mean(x, dim=1)  # type: ignore
             confidence = self.confidence(cls_token) if self.conf_learning else None
             logits = self.head(cls_token)
             return {
                 "logits": logits,
-                "attn_list": attn_list,
                 "confidence": confidence,
                 "cls_token": cls_token if return_cls_token else None,
             }

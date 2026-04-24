@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models_trans import create_block, RMSNorm
+from models_trans import create_block
 from timm.models.layers import trunc_normal_
 from common import (StrideEmbed, FixedCosineEmbed, LearnedCosineEmbed,
                     segm_init_weights, random_masking, NUM_EMBEDDINGS, MTU, MASK_ID, random_masking_seq,
@@ -158,7 +158,7 @@ class NetTransformer(nn.Module):
         x = self.pos_drop(torch.cat((x_size, x_iat, x_byte), dim=1))  # [B, L1+L2+2, D]
         # apply encoder blocks
         for blk in self.encoder_blocks:
-            x = blk(x)[0]
+            x = blk(x)
         if self.num_shared_encoder > 1:
             shared_encoder = self.encoder_blocks[-1] # share the last encoder block
             for _ in range(self.num_shared_encoder - 1):
@@ -186,7 +186,7 @@ class NetTransformer(nn.Module):
         x = x + self.byte_decoder_pos_embed
         # apply Mamba blocks
         for blk in self.byte_decoder_blocks:
-            x = blk(x)[0]
+            x = blk(x)
         # predictor projection
         x = self.byte_decoder_pred(x)
         # remove cls token
@@ -215,9 +215,10 @@ class NetTransformer(nn.Module):
         # x_size = x_size.to(dtype=torch.long)
         if self.is_pretrain:
             # byte pre-training
-            latent, byte_mask, ids_restore, size_mask, iat_mask = self.forward_encoder(x_byte, x_size, x_iat,
-                                                                byte_mask_ratio, size_mask_ratio, iat_mask_ratio, 
-                                                                byte_mask, size_mask, iat_mask, if_mask=True)
+            latent, byte_mask, ids_restore, size_mask, iat_mask = self.forward_encoder(
+                x_byte, x_size, x_iat,
+                byte_mask_ratio, size_mask_ratio, iat_mask_ratio,
+                if_mask=True)
             size_latent = latent[:, :self.num_size_patches+1, :]  # size features
             iat_latent = latent[:, self.num_size_patches+1: self.num_size_patches+self.num_iat_patches+2, :]  # iat features
             byte_latent = latent[:, self.num_size_patches+self.num_iat_patches+2:, :]  # byte features
@@ -233,8 +234,8 @@ class NetTransformer(nn.Module):
             # return losses
             return byte_loss, size_loss, iat_loss
         else:
-            latent = self.forward_encoder(x_byte, x_size, x_iat, 0.0, 0.0, 0.0, 
-                                          byte_mask, size_mask, iat_mask, if_mask=False)
+            latent = self.forward_encoder(x_byte, x_size, x_iat, 0.0, 0.0, 0.0,
+                                          if_mask=False)
             byte_h = latent[:, -1, :]  # type: ignore
             size_h = latent[:, self.num_size_patches, :]  # type: ignore
             iat_h = latent[:, self.num_size_patches+self.num_iat_patches+1, :]  # type: ignore

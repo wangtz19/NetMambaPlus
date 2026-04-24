@@ -243,7 +243,7 @@ class NetMamba(nn.Module):
         return loss
 
     def forward(self, imgs: torch.Tensor, mask_ratio: float=0.9, return_cls_token: bool=False,
-                extra_labels=None, lengths=None, intervals=None):
+                extra_labels=None, lengths=None, intervals=None, **kwargs):
         # imgs: [B, 1, H, W]
         B, C, H, W = imgs.shape
         assert C == 1, "Input images should be grayscale"

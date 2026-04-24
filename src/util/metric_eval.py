@@ -306,7 +306,8 @@ def search_auc_temperature(logits, labels, save_dir, conf_type="max_prob", lr=0.
 
 
 def draw_confusion_matrix(cm, idx2label, save_path=None):
-    cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    cm = np.asarray(cm).astype('float')
+    cm = cm / cm.sum(axis=1)[:, np.newaxis]
     plt.rcParams.update({'font.size': 14})
     plt.figure(figsize=(10, 8))
     class_names = [idx2label[i] for i in range(len(idx2label))]

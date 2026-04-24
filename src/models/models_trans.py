@@ -75,9 +75,8 @@ class BasicTransformer(nn.Module):
     """
 
     def __init__(self, d_model: int, n_heads: int, d_head: int, dropout: float=0.1,
-                 use_flash_attention: bool=False, is_gated: bool=False, return_attn=False,
-                 use_rope: bool=False, max_seq_len: int=1024, distill_attn=False,
-                 elementwise_attn_output_gate: bool=False):
+                 use_flash_attention: bool=False, is_gated: bool=False,
+                 use_rope: bool=False, max_seq_len: int=1024):
         """
         :param d_model: is the input embedding size
         :param n_heads: is the number of attention heads
@@ -85,7 +84,7 @@ class BasicTransformer(nn.Module):
         """
         super().__init__()
         # Self-attention layer and pre-norm layer
-        self.attn = SelfAttention(d_model, n_heads, d_head, 
+        self.attn = SelfAttention(d_model, n_heads, d_head,
                                   use_flash_attention=use_flash_attention,)
         self.norm1 = nn.LayerNorm(d_model)
         self.ff = FeedForward(d_model, is_gated=is_gated)
@@ -106,12 +105,11 @@ class BasicTransformer(nn.Module):
             freqs_cis = self.freqs_cis[:x.shape[1], :].to(x.device)
         else:
             freqs_cis = None
-        
+
         x = self.dropout(self.attn(self.norm1(x), precompute_freqs_cis=freqs_cis)) + x
         # Feed-forward network
         x = self.dropout(self.ff(self.norm2(x))) + x
-        #
-        return (x,)
+        return x
 
 
 class SelfAttention(nn.Module):
@@ -335,9 +333,9 @@ class LinearAttention(nn.Module):
         q, k, v = self.to_qkv(x).chunk(3, dim=-1)
         q = self.map_func(q)
         k = self.map_func(k)
-        KV = torch.einsum("bld,blh->bhd", k, v) # KV matrix
-        Z = 1/(torch.einsum("bld,bd->bl", q, k.sum(dim=1)) + self.eps) # Normalization factor
-        V = torch.einsum("bld,bhd,bl->blh", q, KV, Z)
+        KV = torch.einsum("bld,ble->bde", k, v) # [B, D_k, D_v]
+        Z = 1/(torch.einsum("bld,bd->bl", q, k.sum(dim=1)) + self.eps) # [B, L]
+        V = torch.einsum("bld,bde,bl->ble", q, KV, Z) # [B, L, D_v]
         return V.contiguous()
     
 
@@ -352,7 +350,7 @@ class LinearTransformer(nn.Module):
         self.ff = FeedForward(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
-    
+
     def forward(self, x: torch.Tensor):
         """
         :param x: are the input embeddings of shape `[batch_size, seq_len, d_model]`
@@ -374,7 +372,7 @@ class SparseTransformer(nn.Module):
         self.ff = FeedForward(d_model)
         self.norm2 = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
-    
+
     def forward(self, x: torch.Tensor):
         """
         :param x: are the input embeddings of shape `[batch_size, seq_len, d_model]`
